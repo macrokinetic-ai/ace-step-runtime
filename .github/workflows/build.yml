@@ -1,0 +1,39 @@
+name: build ace-step image
+on:
+  workflow_dispatch:
+  push:
+    paths: [Dockerfile, .github/workflows/build.yml]
+permissions:
+  contents: read
+  packages: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Free disk space (the runner has ~14 GB free; the image is ~15-20 GB)
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL \
+                      /usr/local/share/boost /usr/local/.ghcup /usr/share/swift /usr/local/lib/node_modules
+          sudo docker image prune --all --force
+          sudo apt-get clean
+          df -h /
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push (linux/amd64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/ace-step-runtime:ca1e85f
+            ghcr.io/${{ github.repository_owner }}/ace-step-runtime:latest
+      - name: Disk after build
+        if: always()
+        run: df -h /
